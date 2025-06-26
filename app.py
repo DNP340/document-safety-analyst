@@ -15,7 +15,6 @@ if not st.session_state.api_valid:
     if api_key:
         try:
             client = openai.OpenAI(api_key=api_key)
-            # Test with a lightweight call to validate
             _ = client.models.list()
             st.session_state.api_key = api_key
             st.session_state.api_valid = True
@@ -43,34 +42,67 @@ if uploaded_file and st.session_state.api_valid:
     confirm = st.button("🚨 CONFIRM", key="confirm")
 
     if confirm:
-        questions = [
-            "Assess the weather and NOTAM and provide an overall TEM assessment of the flight",
-            "Highlight any other associated threats and suitable mitigations for the airspace and countries associated with the flight",
-            "Review British foreign office for travel to each of the countries",
-            "Are all required regulatory references present? If any are missing, highlight them.",
-            "Are NOTAMs, weather information, or airport data outdated or missing?",
-            "List the 3 closest Marriott group hotels to destination airport",
-            "Are crew rest, accommodation, or duty arrangements mentioned, and are they appropriate?",
-            "Are contingency or emergency procedures documented? Summarise them.",
-            "Are risk mitigations clearly defined?",
-            "Are responsibilities and accountabilities clearly allocated?"
+        question_pdf = "1. Assess the weather and NOTAM and provide an overall TEM assessment of the flight"
+        questions_general = [
+            "2. Highlight any other associated threats and suitable mitigations for the airspace and countries associated with the flight",
+            "3. Review British foreign office for travel to each of the countries",
+            "4. Are all required regulatory references present? If any are missing, highlight them.",
+            "5. [Placeholder – Please specify Question 5]",
+            "6. List the 3 closest Marriott group hotels to destination airport",
+            "7. Are crew rest, accommodation, or duty arrangements mentioned, and are they appropriate?",
+            "8. Are contingency or emergency procedures documented? Summarise them.",
+            "9. Are risk mitigations clearly defined?",
+            "10. Are responsibilities and accountabilities clearly allocated?"
         ]
-        prompt_template = "Apply these questions to the provided document text:\n"
-        for idx, q in enumerate(questions, 1):
-            prompt_template += f"{idx}. {q}\n"
 
+        # Chunk the PDF text
         chunks = chunk_text(text, chunk_size=3000)
-        combined_output = ""
-        with st.spinner(f"💬 Processing {len(chunks)} chunk(s)..."):
-            for i, chunk in enumerate(chunks, 1):
-                prompt = prompt_template + f"\nDocument text:\n{chunk}"
+
+        # Collect partial responses for Q1
+        partial_answers_q1 = []
+        with st.spinner(f"💬 Processing {len(chunks)} PDF chunk(s) for Question 1..."):
+            for chunk in chunks:
+                prompt_q1 = f"{question_pdf}\n\nDocument text:\n{chunk}"
                 try:
                     response = client.chat.completions.create(
                         model="gpt-3.5-turbo",
-                        messages=[{"role": "user", "content": prompt}]
+                        messages=[{"role": "user", "content": prompt_q1}]
                     )
-                    combined_output += response.choices[0].message.content + "\n"
+                    partial_answers_q1.append(response.choices[0].message.content.strip())
                 except Exception as e:
-                    combined_output += f"\n❌ Error processing chunk {i}: {e}\n"
+                    partial_answers_q1.append(f"❌ Error: {e}")
+
+        # Collate partial answers into one combined summary
+        prompt_collate = (
+            "You are an aviation safety analyst. Summarise and synthesise the following responses "
+            "into a single coherent answer to the question: 'Assess the weather and NOTAM and provide an overall TEM assessment of the flight.'\n\n"
+            + "\n\n".join(partial_answers_q1)
+        )
+
+        try:
+            final_response_q1 = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt_collate}]
+            )
+            output_q1 = final_response_q1.choices[0].message.content.strip()
+        except Exception as e:
+            output_q1 = f"❌ Error while collating Q1: {e}"
+
+        # Handle Q2–Q10 with general knowledge
+        prompt_general = "Please answer the following questions using your general knowledge and external context.\n\n" + "\n".join(questions_general)
+        output_general = ""
+        try:
+            response_general = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[{"role": "user", "content": prompt_general}]
+            )
+            output_general = response_general.choices[0].message.content.strip()
+        except Exception as e:
+            output_general = f"❌ Error while processing Questions 2–10: {e}"
+
         st.success("✅ Analysis complete!")
-        st.markdown(combined_output)
+        st.markdown("### 📝 **Response to Question 1 (based on PDF):**")
+        st.markdown(output_q1)
+        st.markdown("---")
+        st.markdown("### 🌐 **Responses to Questions 2–10 (general knowledge):**")
+        st.markdown(output_general)
