@@ -88,24 +88,22 @@ if uploaded_file and st.session_state.api_valid:
             output_q1 = f"❌ Error while collating Q1: {e}"
 
         # Handle Q2–Q10 with general AI-based knowledge
-        prompt_general = (
-            "Using general aviation, regulatory, and operational knowledge, and optionally referencing the context below, "
-            "please provide clear and concise answers to the following questions:\n\n"
-            + "\n".join(questions_general) +
-            f"\n\n[Context for reference – do not rely on it]:\n{text[:4000]}"
-        )
-        try:
-            response_general = client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=[{"role": "user", "content": prompt_general}]
-            )
-            output_general = response_general.choices[0].message.content.strip()
-        except Exception as e:
-            output_general = f"❌ Error while processing Questions 2–10: {e}"
+        answers_general = []
+        with st.spinner("💬 Answering Questions 2–10 using general knowledge..."):
+            for question in questions_general:
+                try:
+                    response = client.chat.completions.create(
+                        model="gpt-3.5-turbo",
+                        messages=[{"role": "user", "content": f"Answer this question using general aviation and world knowledge:\n{question}"}]
+                    )
+                    answer = response.choices[0].message.content.strip()
+                    answers_general.append(answer)
+                except Exception as e:
+                    answers_general.append(f"❌ Error: {e}")
 
-        # Present final 10 answers
+        # Present final answers
         st.success("✅ Analysis complete!")
         st.markdown("### ✈️ Final Answers:")
         st.markdown("**1.** " + output_q1)
-        st.markdown("---")
-        st.markdown(output_general)
+        for i, answer in enumerate(answers_general, start=2):
+            st.markdown(f"**{i}.** {answer}")
