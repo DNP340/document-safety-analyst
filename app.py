@@ -61,14 +61,13 @@ if uploaded_file and st.session_state.api_valid:
 
         with st.spinner("🧠 Analysing briefing pack..."):
             for chunk in chunks:
-                prompt = (
-                    "You are a senior flight operations analyst. Review the following briefing pack excerpt "
-                    "and extract key operational information about weather and NOTAMs. "
-                    "Focus on threats, operational risks, and suggested mitigations.
+                prompt = f"""
+You are a senior flight operations analyst. Review the following briefing pack excerpt
+and extract key operational information about weather and NOTAMs.
+Focus on threats, operational risks, and suggested mitigations.
 
-"
-                    f"{chunk}"
-                )
+{chunk}
+"""
                 try:
                     response = client.chat.completions.create(
                         model="gpt-3.5-turbo",
@@ -78,13 +77,12 @@ if uploaded_file and st.session_state.api_valid:
                 except Exception as e:
                     partial_answers.append(f"Error: {e}")
 
-        collate_prompt = (
-            "Summarise the following aviation weather and NOTAM notes into a single operational-style briefing. "
-            "Structure it using ICAO threat and mitigation terminology.
+        collate_prompt = f"""
+Summarise the following aviation weather and NOTAM notes into a single operational-style briefing.
+Structure it using ICAO threat and mitigation terminology.
 
-"
-            + "\n\n".join(partial_answers)
-        )
+{"\n\n".join(partial_answers)}
+"""
 
         try:
             collated = client.chat.completions.create(
@@ -95,14 +93,12 @@ if uploaded_file and st.session_state.api_valid:
         except Exception as e:
             section_one = f"❌ Error while collating results: {e}"
 
-        # Foreign Office context
-        fco_prompt = (
-            "Based on the context below, identify any countries or regions mentioned. "
-            "Then summarise the current UK Foreign Office travel advice for those areas.
+        fco_prompt = f"""
+Based on the context below, identify any countries or regions mentioned.
+Then summarise the current UK Foreign Office travel advice for those areas.
 
-"
-            f"{doc_text[:3000]}"
-        )
+{doc_text[:3000]}
+"""
         try:
             response_fco = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -118,7 +114,6 @@ if uploaded_file and st.session_state.api_valid:
         st.markdown("### 📝 Briefing Output")
         st.text_area("Flight Analysis", full_report, height=400)
 
-        # Optional download
         if st.button("📥 Download PDF"):
             pdf = generate_pdf(full_report)
             pdf.output("/tmp/briefing_summary.pdf")
