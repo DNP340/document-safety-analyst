@@ -1,7 +1,11 @@
 import streamlit as st
 from PyPDF2 import PdfReader
+import openai
 
 st.title("📄 Document Safety Analyst Tool")
+
+# API key input
+api_key = st.text_input("🔑 Paste your OpenAI API key:", type="password")
 
 uploaded_file = st.file_uploader("Upload your PDF", type="pdf")
 
@@ -15,33 +19,39 @@ if uploaded_file:
         else:
             text += f"\n--- Page {page_num} ---\n[No text extracted]\n"
 
-    st.text_area("📑 Extracted Document Text (copy this into ChatGPT prompt below)", text, height=400)
+    st.text_area("📑 Extracted Document Text", text, height=300)
 
-    st.markdown("""
-    ### ✅ Standard Prompt to Paste into ChatGPT
-    ```
-    Apply the following questions to the document text:
-    1️⃣ What is the purpose of this document?
-    2️⃣ Are there any operational limitations specified?
-    3️⃣ Are there any safety-critical items noted?
-    4️⃣ Are all required regulatory references present? If any are missing, highlight them.
-    5️⃣ Are NOTAMs, weather information, or airport data outdated or missing?
-    6️⃣ Are any MEL/CDL items declared?
-    7️⃣ Are crew rest, accommodation, or duty arrangements mentioned, and are they appropriate?
-    8️⃣ Are contingency or emergency procedures documented? Summarise them.
-    9️⃣ Are risk mitigations clearly defined?
-    🔟 Are responsibilities and accountabilities clearly allocated?
+    confirm = st.button("🚨 CONFIRM", key="confirm")
 
-    Output format:
-    - Purpose:
-    - Operational limitations:
-    - Safety-critical items:
-    - Regulatory references (present/missing):
-    - NOTAMs/weather/airport data status:
-    - MEL/CDL items:
-    - Crew rest/accommodation:
-    - Contingency procedures:
-    - Risk mitigations:
-    - Responsibilities:
-    ```
-    """)
+    if confirm:
+        if not api_key:
+            st.error("⚠️ Please paste your OpenAI API key before confirming.")
+        else:
+            openai.api_key = api_key
+            questions = [
+                "Assess the weather and NOTAM and provide an overall TEM assessment of the flight",
+                "Highlight any other associated threats and suitable mitigations for the airspace and countries associated with the flight",
+                "Review British foreign office for travel to each of the countries",
+                "Are all required regulatory references present? If any are missing, highlight them.",
+                "Are NOTAMs, weather information, or airport data outdated or missing?",
+                "List the 3 closest Marriott group hotels to destination airport",
+                "Are crew rest, accommodation, or duty arrangements mentioned, and are they appropriate?",
+                "Are contingency or emergency procedures documented? Summarise them.",
+                "Are risk mitigations clearly defined?",
+                "Are responsibilities and accountabilities clearly allocated?"
+            ]
+            prompt = "Apply these questions to the provided document text:\n"
+            for idx, q in enumerate(questions, 1):
+                prompt += f"{idx}. {q}\n"
+            prompt += f"\nDocument text:\n{text}"
+
+            with st.spinner("💬 Querying ChatGPT..."):
+                try:
+                    response = openai.ChatCompletion.create(
+                        model="gpt-4",
+                        messages=[{"role": "user", "content": prompt}]
+                    )
+                    st.success("✅ Analysis complete!")
+                    st.markdown(response['choices'][0]['message']['content'])
+                except Exception as e:
+                    st.error(f"❌ Error: {e}")
