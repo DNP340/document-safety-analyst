@@ -9,6 +9,9 @@ api_key = st.text_input("🔑 Paste your OpenAI API key:", type="password")
 
 uploaded_file = st.file_uploader("Upload your PDF", type="pdf")
 
+def chunk_text(text, chunk_size=3000):
+    return [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
 if uploaded_file:
     reader = PdfReader(uploaded_file)
     text = ""
@@ -40,18 +43,24 @@ if uploaded_file:
                 "Are risk mitigations clearly defined?",
                 "Are responsibilities and accountabilities clearly allocated?"
             ]
-            prompt = "Apply these questions to the provided document text:\n"
+            prompt_template = "Apply these questions to the provided document text:\n"
             for idx, q in enumerate(questions, 1):
-                prompt += f"{idx}. {q}\n"
-            prompt += f"\nDocument text:\n{text}"
+                prompt_template += f"{idx}. {q}\n"
 
-            with st.spinner("💬 Querying ChatGPT..."):
-                try:
-                    response = client.chat.completions.create(
-                        model="gpt-3.5-turbo",
-                        messages=[{"role": "user", "content": prompt}]
-                    )
-                    st.success("✅ Analysis complete!")
-                    st.markdown(response.choices[0].message.content)
-                except Exception as e:
-                    st.error(f"❌ Error: {e}")
+            chunks = chunk_text(text, chunk_size=3000)
+            combined_output = ""
+            with st.spinner(f"💬 Processing {len(chunks)} chunk(s)..."):
+                for i, chunk in enumerate(chunks, 1):
+                    st.info(f"Processing chunk {i}/{len(chunks)}...")
+                    prompt = prompt_template + f"\nDocument text:\n{chunk}"
+                    try:
+                        response = client.chat.completions.create(
+                            model="gpt-3.5-turbo",
+                            messages=[{"role": "user", "content": prompt}]
+                        )
+                        combined_output += f"\n--- Response for chunk {i} ---\n"
+                        combined_output += response.choices[0].message.content + "\n"
+                    except Exception as e:
+                        combined_output += f"\n❌ Error processing chunk {i}: {e}\n"
+            st.success("✅ Analysis complete!")
+            st.markdown(combined_output)
