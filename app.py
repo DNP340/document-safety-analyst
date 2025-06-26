@@ -27,7 +27,7 @@ if uploaded_file:
         if not api_key:
             st.error("⚠️ Please paste your OpenAI API key before confirming.")
         else:
-            openai.api_key = api_key
+            client = openai.OpenAI(api_key=api_key)
             questions = [
                 "Assess the weather and NOTAM and provide an overall TEM assessment of the flight",
                 "Highlight any other associated threats and suitable mitigations for the airspace and countries associated with the flight",
@@ -47,11 +47,11 @@ if uploaded_file:
 
             with st.spinner("💬 Querying ChatGPT..."):
                 try:
-                    response = openai.ChatCompletion.create(
+                    response = client.chat.completions.create(
                         model="gpt-4",
                         messages=[{"role": "user", "content": prompt}]
                     )
                     st.success("✅ Analysis complete!")
-                    st.markdown(response['choices'][0]['message']['content'])
+                    st.markdown(response.choices[0].message.content)
                 except Exception as e:
                     st.error(f"❌ Error: {e}")
