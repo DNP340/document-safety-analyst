@@ -47,7 +47,7 @@ if uploaded_file and st.session_state.api_valid:
             "2. Highlight any other associated threats and suitable mitigations for the airspace and countries associated with the flight",
             "3. Review British foreign office for travel to each of the countries",
             "4. Are all required regulatory references present? If any are missing, highlight them.",
-            "5. [Placeholder – Please specify Question 5]",
+            "5. Identify any geopolitical or regulatory factors that could influence operational decision-making",
             "6. List the 3 closest Marriott group hotels to destination airport",
             "7. Are crew rest, accommodation, or duty arrangements mentioned, and are they appropriate?",
             "8. Are contingency or emergency procedures documented? Summarise them.",
@@ -60,7 +60,7 @@ if uploaded_file and st.session_state.api_valid:
 
         # Collect partial responses for Q1
         partial_answers_q1 = []
-        with st.spinner(f"💬 Processing {len(chunks)} PDF chunk(s) for Question 1..."):
+        with st.spinner("💬 Analysing Question 1 using the PDF..."):
             for chunk in chunks:
                 prompt_q1 = f"{question_pdf}\n\nDocument text:\n{chunk}"
                 try:
@@ -72,13 +72,12 @@ if uploaded_file and st.session_state.api_valid:
                 except Exception as e:
                     partial_answers_q1.append(f"❌ Error: {e}")
 
-        # Collate partial answers into one combined summary
+        # Collate all Q1 answers into one final summary
         prompt_collate = (
-            "You are an aviation safety analyst. Summarise and synthesise the following responses "
-            "into a single coherent answer to the question: 'Assess the weather and NOTAM and provide an overall TEM assessment of the flight.'\n\n"
+            "Summarise the following into a single, coherent answer to the question: "
+            "'Assess the weather and NOTAM and provide an overall TEM assessment of the flight.'\n\n"
             + "\n\n".join(partial_answers_q1)
         )
-
         try:
             final_response_q1 = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -88,9 +87,13 @@ if uploaded_file and st.session_state.api_valid:
         except Exception as e:
             output_q1 = f"❌ Error while collating Q1: {e}"
 
-        # Handle Q2–Q10 with general knowledge
-        prompt_general = "Please answer the following questions using your general knowledge and external context.\n\n" + "\n".join(questions_general)
-        output_general = ""
+        # Handle Q2–Q10 with general AI-based knowledge
+        prompt_general = (
+            "Using general aviation, regulatory, and operational knowledge, and optionally referencing the context below, "
+            "please provide clear and concise answers to the following questions:\n\n"
+            + "\n".join(questions_general) +
+            f"\n\n[Context for reference – do not rely on it]:\n{text[:4000]}"
+        )
         try:
             response_general = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -100,9 +103,9 @@ if uploaded_file and st.session_state.api_valid:
         except Exception as e:
             output_general = f"❌ Error while processing Questions 2–10: {e}"
 
+        # Present final 10 answers
         st.success("✅ Analysis complete!")
-        st.markdown("### 📝 **Response to Question 1 (based on PDF):**")
-        st.markdown(output_q1)
+        st.markdown("### ✈️ Final Answers:")
+        st.markdown("**1.** " + output_q1)
         st.markdown("---")
-        st.markdown("### 🌐 **Responses to Questions 2–10 (general knowledge):**")
         st.markdown(output_general)
